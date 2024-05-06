@@ -42,7 +42,7 @@ async fn main() {
 
         if let Ok(_) = std::env::var("AXIOM_TOKEN") {
             let axiom_layer = tracing_axiom::builder()
-                .with_service_name("org")
+                .with_service_name("gh")
                 .with_tags(&[(
                     &"deployment_id",
                     &std::env::var("RAILWAY_DEPLOYMENT_ID")
@@ -73,7 +73,11 @@ async fn main() {
 
     let app = Router::new()
         .route("/contributions/:user", get(contributions))
-        .layer(CorsLayer::new().allow_origin("http://finndore.dev".parse::<HeaderValue>().unwrap()))
+        .layer(
+            CorsLayer::new()
+                .allow_origin("https://finndore.dev".parse::<HeaderValue>().unwrap())
+                .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap()),
+        )
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or("3002".to_string());
