@@ -35,7 +35,7 @@ pub async fn contributions(
         r#"{{
             "userName": "{}"
         }}"#,
-        user
+        state.user.clone().or(Some(user)).unwrap()
     );
     let github_token = &state.github_token;
     let client = reqwest::Client::new();
