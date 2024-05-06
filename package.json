@@ -1,0 +1,11 @@
+{
+    "name": "gh",
+    "scripts": {
+        "dev": "cargo watch -x run"
+    },
+    "packageManager": "pnpm@8.15.7",
+    "engines": {
+        "pnpm": "8.15.7",
+        "node": "v20.12.2"
+    }
+}
