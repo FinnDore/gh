@@ -2,6 +2,7 @@ use axum::{
     extract::{Path, State},
     Json,
 };
+use chrono::Days;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, instrument};
 
@@ -11,7 +12,7 @@ use crate::SharedState;
 pub async fn contributions(
     Path(user): Path<String>,
     State(state): State<SharedState>,
-) -> Result<Json<Vec<Week>>, String> {
+) -> Result<Json<Vec<ContributionDay>>, String> {
     info!(user);
     let query = r#"
         query($userName:String!) {
@@ -69,7 +70,10 @@ pub async fn contributions(
             .user
             .contributions_collection
             .contribution_calendar
-            .weeks,
+            .weeks
+            .iter()
+            .flat_map(|week| week.contribution_days.clone())
+            .collect(),
     ))
 }
 
