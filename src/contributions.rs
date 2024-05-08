@@ -15,25 +15,20 @@ pub async fn contributions(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<ContributionDay>>, String> {
     info!("Incoming contributions request");
-    let contributions_last_cache_time_ms_lock = state.contributions_last_cache_time_ms.read().await;
-    if contributions_last_cache_time_ms_lock.clone()
+    if state.contributions_last_cache_time_ms.read().await.clone()
         > chrono::Utc::now().timestamp_millis() - CACHE_TTL_MS
     {
         let contributions_lock = state.contributions_cache.read().await;
         if contributions_lock.is_none() {
             error!("Cached contributions are None but TTL set");
 
-            let mut contributions_last_cache_time_ms_write_lock =
-                state.contributions_last_cache_time_ms.write().await;
-            *contributions_last_cache_time_ms_write_lock = 0;
+            *state.contributions_last_cache_time_ms.write().await = 0;
             return Err("internal".to_string());
         }
         info!("Returning cached contributions");
         return Ok(Json(contributions_lock.as_ref().unwrap().clone()));
     }
-    drop(contributions_last_cache_time_ms_lock);
 
-    info!(user);
     let query = r#"
         query($userName:String!) {
             user(login: $userName){
@@ -94,10 +89,7 @@ pub async fn contributions(
         .flat_map(|week| week.contribution_days.clone())
         .collect();
 
-    let mut contributions_last_cache_time_ms_write_lock =
-        state.contributions_last_cache_time_ms.write().await;
-
-    *contributions_last_cache_time_ms_write_lock = chrono::Utc::now().timestamp_millis();
+    *state.contributions_last_cache_time_ms.write().await = chrono::Utc::now().timestamp_millis();
 
     state
         .contributions_cache
