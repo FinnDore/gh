@@ -2,17 +2,37 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use chrono::Days;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, instrument};
 
 use crate::SharedState;
+
+const CACHE_TTL_MS: i64 = chrono::Duration::hours(12).num_milliseconds();
 
 #[instrument(skip(state))]
 pub async fn contributions(
     Path(user): Path<String>,
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<ContributionDay>>, String> {
+    info!("Incoming contributions request");
+    let contributions_last_cache_time_ms_lock = state.contributions_last_cache_time_ms.read().await;
+    if contributions_last_cache_time_ms_lock.clone()
+        > chrono::Utc::now().timestamp_millis() - CACHE_TTL_MS
+    {
+        let contributions_lock = state.contributions_cache.read().await;
+        if contributions_lock.is_none() {
+            error!("Cached contributions are None but TTL set");
+
+            let mut contributions_last_cache_time_ms_write_lock =
+                state.contributions_last_cache_time_ms.write().await;
+            *contributions_last_cache_time_ms_write_lock = 0;
+            return Err("internal".to_string());
+        }
+        info!("Returning cached contributions");
+        return Ok(Json(contributions_lock.as_ref().unwrap().clone()));
+    }
+    drop(contributions_last_cache_time_ms_lock);
+
     info!(user);
     let query = r#"
         query($userName:String!) {
@@ -64,17 +84,29 @@ pub async fn contributions(
     }
 
     let parsed_body: GithubContributionsResponse = json_body.unwrap();
-    Ok(Json(
-        parsed_body
-            .data
-            .user
-            .contributions_collection
-            .contribution_calendar
-            .weeks
-            .iter()
-            .flat_map(|week| week.contribution_days.clone())
-            .collect(),
-    ))
+    let contributions: Vec<ContributionDay> = parsed_body
+        .data
+        .user
+        .contributions_collection
+        .contribution_calendar
+        .weeks
+        .iter()
+        .flat_map(|week| week.contribution_days.clone())
+        .collect();
+
+    let mut contributions_last_cache_time_ms_write_lock =
+        state.contributions_last_cache_time_ms.write().await;
+
+    *contributions_last_cache_time_ms_write_lock = chrono::Utc::now().timestamp_millis();
+
+    state
+        .contributions_cache
+        .write()
+        .await
+        .replace(contributions.clone());
+
+    info!("Returning unached contributions");
+    Ok(Json(contributions))
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

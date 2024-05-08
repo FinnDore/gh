@@ -2,6 +2,7 @@ mod contributions;
 use axum::http::HeaderValue;
 use axum::routing::get;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tracing::instrument;
 use tracing::{info, level_filters::LevelFilter};
@@ -16,11 +17,18 @@ use tracing_subscriber::{fmt, prelude::*, Registry};
 pub struct TheState {
     pub github_token: String,
     pub user: Option<String>,
+    pub contributions_cache: Arc<RwLock<Option<Vec<contributions::ContributionDay>>>>,
+    pub contributions_last_cache_time_ms: Arc<RwLock<i64>>,
 }
 
 impl TheState {
     pub fn new(github_token: String, user: Option<String>) -> Self {
-        Self { github_token, user }
+        Self {
+            github_token,
+            user,
+            contributions_cache: Arc::new(None.into()),
+            contributions_last_cache_time_ms: Arc::new(0.into()),
+        }
     }
 }
 
