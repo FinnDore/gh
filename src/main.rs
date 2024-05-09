@@ -62,7 +62,7 @@ async fn main() {
                         })
                         .unwrap_or("unknown_deployment".into()),
                 )])
-                .with_tags(&[(&"service.name", "org".into())])
+                .with_tags(&[(&"service.name", "gh".into())])
                 .layer()
                 .expect("Axiom layer failed to initialize");
 
