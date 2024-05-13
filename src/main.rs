@@ -1,11 +1,12 @@
 mod contributions;
+use axum::http::request::Parts;
 use axum::http::HeaderValue;
 use axum::routing::get;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tower_http::cors::CorsLayer;
-use tracing::instrument;
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, level_filters::LevelFilter};
+use tracing::{instrument, warn};
 
 use crate::contributions::contributions;
 
@@ -81,11 +82,21 @@ async fn main() {
 
     let app = Router::new()
         .route("/contributions/:user", get(contributions))
-        .layer(
-            CorsLayer::new()
-                .allow_origin("https://finndore.dev".parse::<HeaderValue>().unwrap())
-                .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap()),
-        )
+        .layer(CorsLayer::new().allow_origin(AllowOrigin::predicate(
+            |origin: &HeaderValue, _request_parts: &Parts| {
+                if let Ok(host) = origin.to_str() {
+                    return [
+                        "https://finndore.dev",
+                        "finnnn.vercel.app",
+                        "http://localhost:3000",
+                    ]
+                    .into_iter()
+                    .any(|allowed_origin| host.ends_with(allowed_origin));
+                }
+                warn!(?origin, "Cors layer failed to parse origin header");
+                false
+            },
+        )))
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or("3002".to_string());
